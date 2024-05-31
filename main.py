@@ -9,8 +9,7 @@
 import pandas as pd
 from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtWidgets import QFileDialog, QDialog, QMessageBox
-from modules import SLMISHandler, TableModel
-from authenticationDialog import Ui_Dialog
+from modules import SLMISHandler, TableModel, Ui_Dialog, Ui_MainWindow
 from selenium.webdriver.common.by import By
 import json
 import os
@@ -21,7 +20,18 @@ FILE_FILTERS = [
  "Excel Files (*.xlsx *.xls)",
 ]
 
-class Ui_MainWindow(object):
+class UiHandler(Ui_MainWindow):
+    def __init__(self):
+        super().__init__()
+    
+    def setupUi(self, MainWindow):
+        super().setupUi(MainWindow)
+        self.sections.itemClicked.connect(self.section_shift)
+        self.generateTemplateBttn.clicked.connect(self.generate_template)
+        self.loadGradeBttn.clicked.connect(self.load_grades)
+        self.gradeBttn.clicked.connect(self.grade)
+
+
     def debug_init(self):
 
         cred = json.load(open("auth_success.json"))
@@ -41,92 +51,8 @@ class Ui_MainWindow(object):
         for section in all_sections_dict.keys():
             section = self.handler.view_cleaner(section)
             self.sections.addItem(section)
-        self.label.setText(self.sections.item(1).text())
+        self.label.setText(self.sections.item(0).text())
         self.handler.init_sections()
-        
-    def setupUi(self, MainWindow):
-        MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1182, 922)
-        self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
-        self.centralwidget.setObjectName("centralwidget")
-        self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.centralwidget)
-        self.horizontalLayout_2.setObjectName("horizontalLayout_2")
-
-        self.sections = QtWidgets.QListWidget(parent=self.centralwidget)
-        self.sections.setObjectName("sections")
-        self.sections.itemClicked.connect(self.section_shift)
-
-        self.horizontalLayout_2.addWidget(self.sections)
-        self.mainFrame = QtWidgets.QFrame(parent=self.centralwidget)
-        self.mainFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        self.mainFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
-        self.mainFrame.setObjectName("mainFrame")
-        self.verticalLayout = QtWidgets.QVBoxLayout(self.mainFrame)
-        self.verticalLayout.setObjectName("verticalLayout")
-        self.label = QtWidgets.QLabel(parent=self.mainFrame)
-        font = QtGui.QFont()
-        font.setPointSize(16)
-        self.label.setFont(font)
-        self.label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self.label.setObjectName("sectionName")
-        self.verticalLayout.addWidget(self.label)
-        self.horizontalLayout = QtWidgets.QHBoxLayout()
-        self.horizontalLayout.setObjectName("horizontalLayout")
-
-        self.generateTemplateBttn = QtWidgets.QPushButton(parent=self.mainFrame)
-        self.generateTemplateBttn.setObjectName("generateTemplateBttn")
-        self.generateTemplateBttn.clicked.connect(self.generate_template)
-        self.horizontalLayout.addWidget(self.generateTemplateBttn)
-
-        self.loadGradeBttn = QtWidgets.QPushButton(parent=self.mainFrame)
-        self.loadGradeBttn.setObjectName("loadGradeBttn")
-        self.loadGradeBttn.clicked.connect(self.load_grades)
-        self.horizontalLayout.addWidget(self.loadGradeBttn)
-
-        self.verticalLayout.addLayout(self.horizontalLayout)
-        self.gradeView = QtWidgets.QTableView(parent=self.mainFrame)
-        self.gradeView.setObjectName("gradeView")
-        self.verticalLayout.addWidget(self.gradeView)
-        self.gradeBttn = QtWidgets.QPushButton(parent=self.mainFrame)
-        self.gradeBttn.setObjectName("gradeBttn")
-        self.gradeBttn.setDisabled(True)
-        self.gradeBttn.clicked.connect(self.grade)
-        self.verticalLayout.addWidget(self.gradeBttn)
-        self.progressBar = QtWidgets.QProgressBar(parent=self.mainFrame)
-        self.progressBar.setProperty("value", 0)
-        self.progressBar.setObjectName("progressBar")
-        self.verticalLayout.addWidget(self.progressBar)
-        self.horizontalLayout_2.addWidget(self.mainFrame)
-        self.horizontalLayout_2.setStretch(0, 2)
-        self.horizontalLayout_2.setStretch(1, 8)
-        MainWindow.setCentralWidget(self.centralwidget)
-        self.menubar = QtWidgets.QMenuBar(parent=MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1182, 21))
-        self.menubar.setObjectName("menubar")
-        self.menuSettings = QtWidgets.QMenu(parent=self.menubar)
-        self.menuSettings.setObjectName("menuSettings")
-        MainWindow.setMenuBar(self.menubar)
-        self.statusbar = QtWidgets.QStatusBar(parent=MainWindow)
-        self.statusbar.showMessage(f"Hello XU - Employee")
-        self.statusbar.setObjectName("statusbar")
-        MainWindow.setStatusBar(self.statusbar)
-        self.actionRelogin = QtGui.QAction(parent=MainWindow)
-        self.actionRelogin.setObjectName("actionRelogin")
-        self.menuSettings.addAction(self.actionRelogin)
-        self.menubar.addAction(self.menuSettings.menuAction())
-
-        self.retranslateUi(MainWindow)
-        QtCore.QMetaObject.connectSlotsByName(MainWindow)
-
-    def retranslateUi(self, MainWindow):
-        _translate = QtCore.QCoreApplication.translate
-        MainWindow.setWindowTitle(_translate("MainWindow", "MainWindow"))
-        self.label.setText(_translate("MainWindow", "Section"))
-        self.generateTemplateBttn.setText(_translate("MainWindow", "Generate Template"))
-        self.loadGradeBttn.setText(_translate("MainWindow", "Load Gradebook"))
-        self.gradeBttn.setText(_translate("MainWindow", "Grade!"))
-        self.menuSettings.setTitle(_translate("MainWindow", "Settings"))
-        self.actionRelogin.setText(_translate("MainWindow", "Relogin"))
     
     def section_shift(self, x):
         item_no = self.sections.currentRow()
@@ -158,6 +84,7 @@ class Ui_MainWindow(object):
         self.statusbar.showMessage("Done!")
         button = QMessageBox.information(None, "Success", "Grading completed!")
 
+    
 
 
 if __name__ == "__main__":
@@ -167,7 +94,7 @@ if __name__ == "__main__":
 
     login_dialog = Ui_Dialog()
     if login_dialog.exec() == QDialog.DialogCode.Accepted:
-        ui = Ui_MainWindow()
+        ui = UiHandler()
         ui.setupUi(MainWindow)
         QMessageBox.information(None, "Success", "Logged in successfully!\nOpening main window...")
         MainWindow.show()
