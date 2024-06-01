@@ -14,10 +14,10 @@ from selenium.common.exceptions import StaleElementReferenceException
 
 import sys
 from PyQt6 import QtCore, QtGui
-from PyQt6.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel
 
 
-class TableModel(QtCore.QAbstractTableModel):
+class TableModel(QAbstractTableModel):
 
     def __init__(self, data):
         super(TableModel, self).__init__()
