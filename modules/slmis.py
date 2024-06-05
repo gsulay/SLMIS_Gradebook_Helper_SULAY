@@ -15,6 +15,7 @@ from selenium.common.exceptions import StaleElementReferenceException
 import sys
 from PyQt6 import QtCore, QtGui
 from PyQt6.QtCore import Qt, QModelIndex, QAbstractTableModel
+import os
 
 
 class TableModel(QAbstractTableModel):
@@ -75,6 +76,9 @@ class SLMISHandler:
             None
         """
         self.driver = webdriver.Chrome()
+        options = webdriver.ChromeOptions()
+        prefs = {"download.default_directory" : os.getcwd()}
+        options.add_experimental_option("prefs",prefs)
         self.driver.get("https://slmis.xu.edu.ph/")
     
     def init_sections(self):
@@ -309,9 +313,25 @@ class SLMISHandler:
             df[i] = ""
 
         df.to_excel(f"{self.sections[gradebook_no]}.xlsx", index=False)
+        
 
     def grade(self, df, gradebook_no):
         self.click_gradebook(gradebook_no)
+
+        def set_grade(grade, name):
+                    ActionChains(self.driver) \
+                    .click(self.driver.find_element(By.ID, name)) \
+                    .key_down(Keys.CONTROL) \
+                    .send_keys("a") \
+                    .key_up(Keys.CONTROL) \
+                    .send_keys(f"{round(grade,2)}")\
+                    .click(self.driver.find_element(By.ID, name)) \
+                    .key_down(Keys.CONTROL) \
+                    .send_keys("a") \
+                    .key_up(Keys.CONTROL) \
+                    .send_keys(f"{round(grade,2)}")\
+                    .perform()
+        
         for i in range(math.ceil(df.shape[1]/2)):
             print(f"on page:",i)
             saved_df = df.iloc[:,i*7+1:1+(i+1)*7]
@@ -323,47 +343,31 @@ class SLMISHandler:
             time.sleep(0.5)
             inputs = self.driver.find_elements(By.XPATH , '//input[@type="text"]')
             element_names = [i.get_attribute("id") for i in inputs if "DERIVED_LAM_GRADE" in i.get_attribute("id")]
-            
+
             
             for name in tqdm(element_names):
                 try:
                     col, row = [int(i) for i in name[18:].split('$')]
                     col = col-1
                     grade = saved_df.iloc[row, col]
+                    
                     if pd.isna(grade):
                         grade = 0
                     if float(f"{round(grade,2)}") == float(self.driver.find_element(By.ID, name).get_attribute("value")):
                         continue
 
-                    ActionChains(self.driver) \
-                    .click(self.driver.find_element(By.ID, name)) \
-                    .key_down(Keys.CONTROL) \
-                    .send_keys("a") \
-                    .key_up(Keys.CONTROL) \
-                    .send_keys(f"{round(grade,2)}")\
-                    .click(self.driver.find_element(By.ID, name)) \
-                    .key_down(Keys.CONTROL) \
-                    .send_keys("a") \
-                    .key_up(Keys.CONTROL) \
-                    .send_keys(f"{round(grade,2)}")\
-                    .perform()
+                    set_grade(grade, name)
+
+                    grade_element = self.driver.find_element(By.ID, name)
+                    #Check if the value is the same
+                    if grade_element.get_attribute("value") != f"{round(grade,2)}":
+                        set_grade(grade, name)
+
                     
                 except StaleElementReferenceException:
                     print("StaleElementReferenceException")
                     time.sleep(1)
-                    ActionChains(self.driver) \
-                    .click(self.driver.find_element(By.ID, name)) \
-                    .key_down(Keys.CONTROL) \
-                    .send_keys("a") \
-                    .key_up(Keys.CONTROL) \
-                    .send_keys(f"{round(grade,2)}")\
-                    .send_keys(Keys.ENTER) \
-                    .click(self.driver.find_element(By.ID, name)) \
-                    .key_down(Keys.CONTROL) \
-                    .send_keys("a") \
-                    .key_up(Keys.CONTROL) \
-                    .send_keys(f"{round(grade,2)}")\
-                    .perform()
+                    set_grade(grade, name)
             try:
                 next_bttn_element = self.driver.find_element(By.XPATH, '//a[@name="DERIVED_LAM_RIGHT_MOVE"]')
                 print("found next button", next_bttn_element.get_attribute('innerHTML'))
