@@ -3,4 +3,6 @@ grades
 __pycache__
 output
 *.gitignore
-./sandbox.ipynb
+*.ipynb
+*.xlsx
+*.csv

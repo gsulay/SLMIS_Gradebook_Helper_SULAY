@@ -8,7 +8,8 @@
 
 import pandas as pd
 from PyQt6 import QtCore, QtGui, QtWidgets
-from PyQt6.QtWidgets import QFileDialog, QDialog, QMessageBox
+from PyQt6.QtWidgets import QFileDialog, QDialog, QMessageBox, QLineEdit
+from PyQt6.QtCore import QPropertyAnimation
 from modules import SLMISHandler, TableModel, Ui_Dialog, Ui_MainWindow
 from selenium.webdriver.common.by import By
 import json
@@ -33,6 +34,19 @@ class UiHandler(Ui_MainWindow):
 
 
     def debug_init(self):
+        """
+        Initializes the debug mode of the application.
+
+        This function is responsible for loading the credentials from the "auth_success.json" file, removing the file after loading, and printing a message indicating that the credentials have been loaded. It then retrieves the username and password from the loaded credentials and assigns them to the `username` and `password` variables.
+
+        Next, it prints a message indicating that the handler is starting. It creates an instance of the `SLMISHandler` class and calls its `authentication` method with the `username` and `password` as arguments. The `username` is also assigned to the `self.username` attribute.
+
+        After that, it retrieves the faculty schedule by calling the `get_faculty_schedule` method of the `self.handler` object and assigns it to the `all_sections_dict` variable. It then iterates over the keys of `all_sections_dict` and cleans the section using the `view_cleaner` method of the `self.handler` object. Each cleaned section is added to the `self.sections` list widget.
+
+        Finally, it sets the text of the `self.label` widget to the text of the first item in the `self.sections` list, calls the `init_sections` method of the `self.handler` object, and shows a welcome message in the `self.statusbar` with the `self.username`.
+
+        This function does not have any parameters and does not return any values.
+        """
 
         cred = json.load(open("auth_success.json"))
         os.remove("auth_success.json")
@@ -43,9 +57,8 @@ class UiHandler(Ui_MainWindow):
         self.handler = SLMISHandler()
         self.handler.authentication(username, password)
         self.username = username
-        # self.handler.authentication("gsulay", "{4_k66iI")
 
-        
+        print("Retrieving schedule...")
         all_sections_dict = self.handler.get_faculty_schedule()
 
         for section in all_sections_dict.keys():
@@ -53,6 +66,8 @@ class UiHandler(Ui_MainWindow):
             self.sections.addItem(section)
         self.label.setText(self.sections.item(0).text())
         self.handler.init_sections()
+        self.statusbar.showMessage(f"Welcome, {self.username}")
+        
     
     def section_shift(self, x):
         item_no = self.sections.currentRow()
@@ -61,8 +76,8 @@ class UiHandler(Ui_MainWindow):
     def generate_template(self):
         self.statusbar.showMessage("Gathering data...")
         item_no = self.sections.currentRow()
-        self.handler.generate_template(item_no)
-        self.statusbar.showMessage("Done!")
+        out_path = self.handler.generate_template(item_no)
+        self.statusbar.showMessage(f"Template generated at {out_path}")
     
     def load_grades(self):
         filter = FILE_FILTERS[0]
@@ -78,6 +93,8 @@ class UiHandler(Ui_MainWindow):
         table_model = TableModel(df)
         self.gradeView.setModel(table_model)
         self.gradeBttn.setDisabled(False)
+        self.currentWorkbookLabel.setText(f"Current Workbook: {filename}")
+        self.statusbar.showMessage(f"Loaded Gradebook: {filename}")
     
     def grade(self):
         self.handler.grade(self.df, self.sections.currentRow())
@@ -93,6 +110,7 @@ if __name__ == "__main__":
     MainWindow = QtWidgets.QMainWindow()
 
     login_dialog = Ui_Dialog()
+    login_dialog.passwordInput.setEchoMode(QLineEdit.EchoMode.Password)
     if login_dialog.exec() == QDialog.DialogCode.Accepted:
         ui = UiHandler()
         ui.setupUi(MainWindow)
@@ -101,6 +119,7 @@ if __name__ == "__main__":
         ui.debug_init()
     else:
         QMessageBox.warning(None, "Failure", "Login failed!")
+        sys.exit()
     
     sys.exit(app.exec())
 

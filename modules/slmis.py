@@ -23,6 +23,7 @@ class TableModel(QAbstractTableModel):
     def __init__(self, data):
         super(TableModel, self).__init__()
         self._data = data
+        self.percent = 0
 
     def data(self, index, role):
         if role == Qt.ItemDataRole.DisplayRole:
@@ -75,10 +76,13 @@ class SLMISHandler:
         Returns:
             None
         """
-        self.driver = webdriver.Chrome()
-        options = webdriver.ChromeOptions()
-        prefs = {"download.default_directory" : os.getcwd()}
-        options.add_experimental_option("prefs",prefs)
+        cache_path = os.path.join(os.getcwd(),'cache')
+        if not os.path.exists(cache_path):
+            os.makedirs(cache_path)
+        chromeOptions = webdriver.ChromeOptions()
+        prefs = {"download.default_directory" : cache_path}
+        chromeOptions.add_experimental_option("prefs",prefs)
+        self.driver = webdriver.Chrome(options=chromeOptions)
         self.driver.get("https://slmis.xu.edu.ph/")
     
     def init_sections(self):
@@ -189,6 +193,7 @@ class SLMISHandler:
             self.check_if_loaded(By.XPATH, '//*[@id="userid"]')
             user_element = self.driver.find_element(By.XPATH, '//*[@id="userid"]')
             pass_element = self.driver.find_element(By.XPATH, '//*[@id="pwd"]')
+            #With ctrl A
             ActionChains(self.driver) \
                 .click(user_element) \
                 .key_down(Keys.CONTROL) \
@@ -238,9 +243,9 @@ class SLMISHandler:
         page_no = 1
         while True:
             try:
+                #Switching to default content
                 self.driver.switch_to.default_content()
                 self.driver.switch_to.frame(self.driver.find_element(By.NAME, "TargetContent"))
-                # table = self.driver.find_element(By.XPATH, '//table[@role="presentation"]')
                 time.sleep(0.5)
                 next_bttn_element = self.driver.find_element(By.XPATH, '//a[@name="DERIVED_LAM_RIGHT_MOVE"]')
                 print("found next button", next_bttn_element.get_attribute('innerHTML'))
@@ -281,6 +286,45 @@ class SLMISHandler:
                 next_bttn_element.click()
 
         return all_desc
+    def formatter(self, file_path: str, out_path: str):
+        try:
+            df = pd.read_csv(file_path, encoding='latin-1', encoding_errors='ignore')
+        
+        except pd.errors.ParserError:   #Error handling for csv with multiple delimiter (Specifically for name with a comma)
+            with open(f"{file_path}", 'r', encoding='latin-1') as f:
+                #Finds the lines with different lengths and saves their index
+                lengths = []
+                all_lines = f.readlines()
+                all_lines = [i.removesuffix('\n') for i in all_lines]
+                for i in all_lines[1:]:
+                    lengths.append(len(i.split(',')))
+                mode_length = max(set(lengths), key=lengths.count)
+                idx_modify = [i-1 for i in lengths if i != mode_length]
+
+                #Gets all the data and removes the 2nd element for the lines with differing lengths
+                new_csv = []
+                for idx,i in enumerate(all_lines):
+                    if idx in idx_modify:
+                        val = i.split(',')
+                        popped = val.pop(1) #Removes 2nd element and merges to the first (deals with names like "DelaCruz, Jr" which has a comma)
+                        val[0] = val[0] + ' ' + popped
+                        new_csv.append(','.join(val))
+                    else:
+                        new_csv.append(i)
+
+            #Saves the cleaned csv
+            with open(f"{file_path}", 'w') as f:
+                for i in new_csv:
+                    f.write(f"{i}\n")
+            df = pd.read_csv(f"{file_path}", encoding='latin-1', encoding_errors='ignore')
+                
+        df['Names'] = df[['Last Name', 'First Name']].apply(lambda x: ','.join(x), axis=1)
+        col_names = df.columns.to_list()
+        col_names = col_names[-1:] + col_names[:-1]
+        df = df[col_names]
+        df.drop(columns=['First Name', 'Last Name','Student ID'], inplace=True)
+        df = df[df.columns.drop(list(df.filter(regex='Unnamed')))]
+        df.to_excel(out_path, index=False)
 
     def generate_template(self, gradebook_no):
         """
@@ -299,20 +343,33 @@ class SLMISHandler:
             Creates an Excel file with the name specified by `self.sections[gradebook_no]` in the current directory.
 
         """
-        all_desc = self.generate_headers(gradebook_no)
-        desc = chain(all_desc)
 
         self.click_gradebook(gradebook_no)
         self.driver.switch_to.default_content()
+        self.check_if_loaded(By.NAME, "TargetContent")
         self.driver.switch_to.frame(self.driver.find_element(By.NAME, "TargetContent"))
+        print('Switched to TargetContent')
+        self.check_if_loaded(By.XPATH, '//*[@id="DERIVED_LAM_EXPORT"]')
+        export_button = self.driver.find_element(By.XPATH, '//*[@id="DERIVED_LAM_EXPORT"]')
+        export_button.click()
 
         time.sleep(1)
-        students = [i.get_attribute("innerHTML") for i in self.driver.find_elements(By.TAG_NAME, 'span') if "HCR_PERSON_NM_I_NAME" in i.get_attribute("id")]
-        df = pd.DataFrame({'Names':students})
-        for i in desc:
-            df[i] = ""
 
-        df.to_excel(f"{self.sections[gradebook_no]}.xlsx", index=False)
+        file_path = None
+        for i in os.listdir('cache'):
+            if 'csv' in i:
+                file_path = i
+                break
+        if file_path == None:
+            print('No File Found')
+            return False
+        
+        file_path = os.path.join('cache', file_path)
+        out_path = f"{self.sections[gradebook_no]}.xlsx"
+        self.formatter(file_path, out_path=out_path)
+        os.remove(file_path)
+        return out_path
+
         
 
     def grade(self, df, gradebook_no):
@@ -331,7 +388,7 @@ class SLMISHandler:
                     .key_up(Keys.CONTROL) \
                     .send_keys(f"{round(grade,2)}")\
                     .perform()
-        
+
         for i in range(math.ceil(df.shape[1]/2)):
             print(f"on page:",i)
             saved_df = df.iloc[:,i*7+1:1+(i+1)*7]
