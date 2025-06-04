@@ -145,6 +145,10 @@ class SLMISHandler:
             courses_dictionary (dict): A dictionary containing the course names as keys and the corresponding table rows as values.
         """
         self.go_to_home_page()
+        #Click on Self Service
+        self.check_if_loaded(By.XPATH, '//*[@id="fldra_CO_EMPLOYEE_SELF_SERVICE"]')
+        self_service = self.driver.find_element(By.XPATH, '//*[@id="fldra_CO_EMPLOYEE_SELF_SERVICE"]')
+        self_service.click()
         #Going to faculty center
         self.check_if_loaded(By.XPATH, '//*[@id="ptifrmtgtframe"]')
         faculty_center = self.driver.find_element(By.XPATH, '//*[@id="ptifrmtgtframe"]')
@@ -343,6 +347,13 @@ class SLMISHandler:
             Creates an Excel file with the name specified by `self.sections[gradebook_no]` in the current directory.
 
         """
+        #Delete all files in cache first
+        to_delete = []
+        for i in os.listdir('cache'):
+            if 'csv' in i:
+                to_delete.append(os.path.join('cache', i))
+        for i in to_delete:
+            os.remove(i)
 
         self.click_gradebook(gradebook_no)
         self.driver.switch_to.default_content()
@@ -354,6 +365,7 @@ class SLMISHandler:
         export_button.click()
 
         time.sleep(1)
+
 
         file_path = None
         for i in os.listdir('cache'):
