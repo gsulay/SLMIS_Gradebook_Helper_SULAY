@@ -113,7 +113,7 @@ if __name__ == "__main__":
     login_dialog.passwordInput.setEchoMode(QLineEdit.EchoMode.Password)
     if login_dialog.exec() == QDialog.DialogCode.Accepted:
         ui = UiHandler()
-        ui.setupUi(None)
+        ui.setupUi(MainWindow)
         QMessageBox.information(None, "Success", "Logged in successfully!\nOpening main window...")
         MainWindow.show()
         ui.debug_init()
